@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { emptyLedger, postDueRecurring, reduce, type Action } from '../core/ledger';
+import { emptyLedger, postDueRecurring, reduce, withSnapshot, type Action } from '../core/ledger';
+import { today } from '../core/dates';
 import type { Ledger } from '../core/schema';
 import { deriveKey, type VaultKey } from '../storage/crypto';
 import * as vault from '../storage/vault';
@@ -91,8 +92,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /** Post salary, rent and other scheduled entries that fell due while the app was closed. */
   const catchUp = useCallback(
     (loaded: Ledger) => {
-      const { ledger: next, posted } = postDueRecurring(loaded);
-      if (posted > 0) {
+      const { ledger: posted0, posted } = postDueRecurring(loaded);
+      // Start each month's net-worth reading as soon as the app is opened in that month.
+      const month = today().slice(0, 7);
+      const needsReading =
+        (posted0.assets.length > 0 || posted0.liabilities.length > 0) &&
+        !posted0.netWorthHistory.some((h) => h.month === month);
+      const next = needsReading ? withSnapshot(posted0) : posted0;
+      if (needsReading && posted === 0) {
+        commit(next);
+      } else if (posted > 0) {
         commit(next);
         notify(`${posted} scheduled ${posted === 1 ? 'entry was' : 'entries were'} added automatically.`);
       } else {

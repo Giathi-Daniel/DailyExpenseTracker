@@ -32,6 +32,11 @@ const paths = {
   offline: 'M3 7a10 10 0 0 1 14 0M5.5 9.8a6.5 6.5 0 0 1 9 0M8 12.5a3 3 0 0 1 4 0M10 15.5h.01',
   arrowUp: 'M10 15V5M6 9l4-4 4 4',
   arrowDown: 'M10 5v10M6 11l4 4 4-4',
+  trend: 'M3 14.5 7.5 10l3 3L17 6.5M12.5 6.5H17V11',
+  flag: 'M5 17.5V3.5M5 4h9.5l-2 3.5 2 3.5H5',
+  check: 'M4.5 10.5 8 14l7.5-8',
+  circle: 'M10 16.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Z',
+  dot: 'M10 16.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Zm0-4a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z',
 } as const;
 
 export type IconName = keyof typeof paths;

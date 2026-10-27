@@ -19,7 +19,10 @@ function RuleDialog({ open, onClose, editing }: { open: boolean; onClose: () => 
   const [note, setNote] = useState(editing?.note ?? '');
   const [frequency, setFrequency] = useState<Frequency>(editing?.frequency ?? 'monthly');
   const [startDate, setStartDate] = useState(editing?.startDate ?? today());
+  const [assetId, setAssetId] = useState(editing?.assetId ?? '');
   const [error, setError] = useState<string | null>(null);
+  const isSaving = kind === 'expense' && ledger.categories.find((c) => c.id === categoryId)?.group === 'savings';
+  const assets = ledger.assets.filter((a) => !a.archived);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -28,7 +31,17 @@ function RuleDialog({ open, onClose, editing }: { open: boolean; onClose: () => 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return setError('Choose a start date.');
     const before = dispatch({
       type: 'recurring/upsert',
-      rule: { id: editing?.id, kind, amount: minor, categoryId, note: note.trim(), frequency, startDate, active: editing?.active ?? true },
+      rule: {
+        id: editing?.id,
+        kind,
+        amount: minor,
+        categoryId,
+        note: note.trim(),
+        frequency,
+        startDate,
+        active: editing?.active ?? true,
+        assetId: isSaving && assetId && assets.some((a) => a.id === assetId) ? assetId : undefined,
+      },
     }).transactions.length;
     // Fill in dates that are already due now instead of waiting for the next launch.
     const posted = dispatch({ type: 'recurring/postDue', asOf: today() }).transactions.length - before;
@@ -77,6 +90,20 @@ function RuleDialog({ open, onClose, editing }: { open: boolean; onClose: () => 
             <span>First date</span>
             <input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </label>
+          {isSaving && assets.length > 0 && (
+            <label className="field span-2">
+              <span>Put into (optional)</span>
+              <select className="select" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
+                <option value="">Not linked</option>
+                {assets.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              <span className="subtle">Each entry adds to that investment's value automatically.</span>
+            </label>
+          )}
           <label className="field span-2">
             <span>Note</span>
             <input className="input" maxLength={140} value={note} placeholder="e.g. Salary, Rent, Chama contribution" onChange={(e) => setNote(e.target.value)} />

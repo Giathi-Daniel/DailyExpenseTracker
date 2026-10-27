@@ -40,6 +40,8 @@ export const Transaction = z.object({
   /** External reference such as an M-Pesa code; used to skip duplicate imports. */
   ref: text(32).optional(),
   recurringId: id.optional(),
+  /** Investment this money went into; its value moves with the transaction. */
+  assetId: id.optional(),
   createdAt: timestamp,
   updatedAt: timestamp,
 });
@@ -60,6 +62,8 @@ export const RecurringRule = z.object({
   /** Last date already posted to the ledger, or null if none yet. */
   lastPosted: isoDate.nullable().default(null),
   active: z.boolean().default(true),
+  /** Each posted entry also moves this investment's value. */
+  assetId: id.optional(),
 });
 export type RecurringRule = z.infer<typeof RecurringRule>;
 
@@ -81,29 +85,124 @@ export const Settings = z.object({
   autoLockMinutes: z.number().int().min(0).max(240).default(10),
   /** First day of the week for weekly views: 0 = Sunday, 1 = Monday. */
   weekStartsOn: z.union([z.literal(0), z.literal(1)]).default(1),
+  /** Assumed yearly inflation, in basis points (500 = 5%). Used for real returns. */
+  inflationBps: z.number().int().min(0).max(5000).default(500),
+  /** Assumed yearly return for projections, in basis points (1000 = 10%). */
+  projectionReturnBps: z.number().int().min(0).max(5000).default(1000),
 });
 export type Settings = z.infer<typeof Settings>;
 
-export const SCHEMA_VERSION = 1 as const;
+// ---- Wealth ----------------------------------------------------------------
+
+/** Rates are stored as integer basis points (1250 = 12.50%) to avoid float drift. */
+const bps = z.number().int().min(0).max(100_000);
+
+export const AssetType = z.enum([
+  'cash',
+  'savings',
+  'mmf',
+  'sacco',
+  'bonds',
+  'stocks',
+  'retirement',
+  'property',
+  'business',
+  'other',
+]);
+export type AssetType = z.infer<typeof AssetType>;
+
+export const Asset = z.object({
+  id,
+  name: text(60).pipe(z.string().min(1)),
+  type: AssetType,
+  /** Current value as the owner last recorded it, in minor units. */
+  value: minor,
+  /** Owner's own assumption of yearly growth or yield. */
+  expectedReturnBps: bps.default(0),
+  updatedAt: isoDate,
+  archived: z.boolean().default(false),
+});
+export type Asset = z.infer<typeof Asset>;
+
+export const LiabilityType = z.enum(['mobile', 'credit', 'student', 'personal', 'car', 'mortgage', 'other']);
+export type LiabilityType = z.infer<typeof LiabilityType>;
+
+export const Liability = z.object({
+  id,
+  name: text(60).pipe(z.string().min(1)),
+  type: LiabilityType,
+  balance: minor,
+  /** Yearly interest rate including fees. */
+  aprBps: bps.default(0),
+  minPayment: minor.default(0),
+  updatedAt: isoDate,
+});
+export type Liability = z.infer<typeof Liability>;
+
+export const Goal = z.object({
+  id,
+  name: text(60).pipe(z.string().min(1)),
+  target: minor.refine((n) => n > 0),
+  targetDate: isoDate.nullable().default(null),
+  /** Progress comes from these assets' values plus any manual amount. */
+  assetIds: z.array(id).max(50).default([]),
+  manualSaved: minor.default(0),
+  createdAt: isoDate,
+});
+export type Goal = z.infer<typeof Goal>;
+
+/** One net-worth reading per calendar month, kept automatically. */
+export const Snapshot = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  assets: minor,
+  liabilities: minor,
+});
+export type Snapshot = z.infer<typeof Snapshot>;
+
+export const SCHEMA_VERSION = 2 as const;
+
+/** Categories introduced after v1; added to older ledgers on load. */
+export const ADDED_CATEGORIES: Category[] = [
+  { id: 'inc-investment', name: 'Interest & dividends', kind: 'income', group: 'income', archived: false },
+  { id: 'inc-rental', name: 'Rental income', kind: 'income', group: 'income', archived: false },
+];
 
 export const Ledger = z.object({
-  version: z.literal(SCHEMA_VERSION),
+  // v1 files are accepted and upgraded in parseLedger.
+  version: z.union([z.literal(1), z.literal(SCHEMA_VERSION)]),
   transactions: z.array(Transaction).max(200_000),
   categories: z.array(Category).max(500),
   budgets: z.array(Budget).max(500),
   recurring: z.array(RecurringRule).max(500),
+  assets: z.array(Asset).max(500).default([]),
+  liabilities: z.array(Liability).max(500).default([]),
+  goals: z.array(Goal).max(200).default([]),
+  netWorthHistory: z.array(Snapshot).max(1200).default([]),
   settings: Settings,
 });
-export type Ledger = z.infer<typeof Ledger>;
+export type Ledger = Omit<z.infer<typeof Ledger>, 'version'> & { version: typeof SCHEMA_VERSION };
 
 export function parseLedger(input: unknown): Ledger {
-  const ledger = Ledger.parse(input);
-  // Referential integrity: drop rows that point at categories that do not exist.
-  const known = new Set(ledger.categories.map((c) => c.id));
+  const parsed = Ledger.parse(input);
+  const categories = [
+    ...parsed.categories,
+    ...ADDED_CATEGORIES.filter((c) => !parsed.categories.some((x) => x.id === c.id)),
+  ];
+  // Referential integrity: drop rows that point at things that do not exist.
+  const knownCats = new Set(categories.map((c) => c.id));
+  const knownAssets = new Set(parsed.assets.map((a) => a.id));
   return {
-    ...ledger,
-    transactions: ledger.transactions.filter((t) => known.has(t.categoryId)),
-    budgets: ledger.budgets.filter((b) => known.has(b.categoryId)),
-    recurring: ledger.recurring.filter((r) => known.has(r.categoryId)),
+    ...parsed,
+    version: SCHEMA_VERSION,
+    categories,
+    transactions: parsed.transactions
+      .filter((t) => knownCats.has(t.categoryId))
+      .map((t) => (t.assetId && !knownAssets.has(t.assetId) ? { ...t, assetId: undefined } : t)),
+    budgets: parsed.budgets.filter((b) => knownCats.has(b.categoryId)),
+    recurring: parsed.recurring
+      .filter((r) => knownCats.has(r.categoryId))
+      .map((r) => (r.assetId && !knownAssets.has(r.assetId) ? { ...r, assetId: undefined } : r)),
+    goals: parsed.goals.map((g) => ({ ...g, assetIds: g.assetIds.filter((a) => knownAssets.has(a)) })),
+    netWorthHistory: [...parsed.netWorthHistory].sort((a, b) => a.month.localeCompare(b.month)),
   };
 }

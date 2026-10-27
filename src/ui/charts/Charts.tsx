@@ -16,7 +16,7 @@ import { formatMoney, formatPct, fractionDigits, toMajor } from '../../core/mone
 import type { Bucket } from '../../core/reports';
 import { Progress } from '../components/common';
 
-const TOKENS = ['--series-1', '--series-2', '--series-3', '--grid', '--axis', '--text-2', '--text-3', '--surface-hover'] as const;
+const TOKENS = ['--series-1', '--series-2', '--series-3', '--series-4', '--grid', '--axis', '--text-2', '--text-3', '--surface-hover'] as const;
 type Token = (typeof TOKENS)[number];
 
 /**
@@ -99,7 +99,7 @@ export function Legend({ items }: { items: Array<{ label: string; color: string 
   );
 }
 
-function useAxis(currency: string) {
+export function useAxis(currency: string) {
   const c = useThemeColors();
   return {
     c,

@@ -18,6 +18,8 @@ import { useEditor } from '../editor';
 import { AllocationBar, CashflowChart, SpendingChart } from '../charts/Charts';
 import { Card, Delta, EmptyState, Kpi, Money, Progress } from '../components/common';
 import { InsightRow } from './Insights';
+import { currentStep, roadmap, wealthPicture } from '../../core/wealth';
+import { Icon } from '../components/Icon';
 import { useLedger } from '../store';
 
 export function OverviewPage() {
@@ -41,6 +43,8 @@ export function OverviewPage() {
       daily: timeSeries(ledger, month, 'day'),
       monthly: timeSeries(ledger, sixMonths, 'month'),
       balance: balanceAsOf(ledger, now),
+      wealth: wealthPicture(ledger, now),
+      steps: roadmap(ledger, now),
       saved: totalSaved(ledger, now),
       insights: generateInsights(ledger, now).slice(0, 4),
       recent: sortTransactions(ledger.transactions.filter((t) => t.date <= now)).slice(0, 8),
@@ -59,6 +63,7 @@ export function OverviewPage() {
             <p className="muted">{formatDate(now, 'long')}</p>
           </div>
         </div>
+        <NextStep steps={data.steps} />
         <Card>
           <EmptyState title="Your ledger is empty">
             <p>Start with what came in this month, then record today's spending. It takes seconds.</p>
@@ -92,16 +97,32 @@ export function OverviewPage() {
         </div>
       </div>
 
+      <NextStep steps={data.steps} />
+
       <div className="grid grid-kpi">
-        <Kpi
-          label="Balance"
-          value={<Money value={data.balance} currency={currency} />}
-          foot={
-            <>
-              <Money value={data.saved} currency={currency} compact /> set aside in savings
-            </>
-          }
-        />
+        {data.wealth.hasWealthData ? (
+          <Kpi
+            label="Net worth"
+            value={<Money value={data.wealth.netWorth} currency={currency} whole className={data.wealth.netWorth < 0 ? 'neg' : ''} />}
+            foot={
+              <>
+                Own <Money value={data.wealth.assets} currency={currency} compact /> · owe{' '}
+                <Money value={data.wealth.liabilities} currency={currency} compact />
+              </>
+            }
+          />
+        ) : (
+          <Kpi
+            label="Balance"
+            value={<Money value={data.balance} currency={currency} />}
+            foot={
+              <>
+                <Money value={data.saved} currency={currency} compact /> set aside ·{' '}
+                <Link to="/wealth">track net worth</Link>
+              </>
+            }
+          />
+        )}
         <Kpi
           label="Income this month"
           value={<Money value={cur.income} currency={currency} />}
@@ -228,5 +249,38 @@ export function OverviewPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function NextStep({ steps }: { steps: ReturnType<typeof roadmap> }) {
+  const step = currentStep(steps);
+  if (!step) {
+    return (
+      <section className="card next-step" data-done="true">
+        <Icon name="positive" />
+        <div>
+          <h2>Every step on your roadmap is done</h2>
+          <p className="muted">Keep investing, keep reviewing monthly, and help someone else start.</p>
+        </div>
+      </section>
+    );
+  }
+  const index = steps.indexOf(step) + 1;
+  return (
+    <section className="card next-step" aria-labelledby="next-step-title">
+      <span className="next-step-index" aria-hidden="true">
+        {index}
+      </span>
+      <div className="next-step-body">
+        <span className="subtle">
+          Your next step · {index} of {steps.length}
+        </span>
+        <h2 id="next-step-title">{step.title}</h2>
+        <p>{step.action}</p>
+      </div>
+      <Link className="btn" to="/wealth">
+        See your roadmap
+      </Link>
+    </section>
   );
 }

@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { transactionsToCsv } from '../../core/csv';
 import { today } from '../../core/dates';
-import { demoLedger } from '../../core/demo';
+import { demoLedger, PERSONAS, type Persona } from '../../core/demo';
 import { mergeLedgers, sortTransactions } from '../../core/ledger';
 import { CURRENCIES } from '../../core/money';
 import type { CategoryGroup, Ledger, Theme } from '../../core/schema';
@@ -167,6 +167,7 @@ function DataSection() {
   const [incoming, setIncoming] = useState<Ledger | null>(null);
   const [confirmWipe, setConfirmWipe] = useState(false);
   const [confirmDemo, setConfirmDemo] = useState(false);
+  const [persona, setPersona] = useState<Persona>('professional');
 
   const exportPlain = async () => {
     downloadFile(`expense-tracker-backup-${today()}.json`, await exportBackup(ledger), 'application/json');
@@ -341,10 +342,28 @@ function DataSection() {
       <ConfirmDialog
         open={confirmDemo}
         title="Load sample data?"
-        body="This replaces your current data with six months of example activity. Download a backup first if you want to keep what you have."
+        body={
+          <div className="stack" style={{ alignItems: 'stretch' }}>
+            <p>
+              This replaces your current data with six months of example activity. Download a backup first if you want
+              to keep what you have.
+            </p>
+            <label className="field">
+              <span>Sample</span>
+              <select className="select" value={persona} onChange={(e) => setPersona(e.target.value as Persona)}>
+                {(Object.keys(PERSONAS) as Persona[]).map((p) => (
+                  <option key={p} value={p}>
+                    {PERSONAS[p].label}
+                  </option>
+                ))}
+              </select>
+              <span className="subtle">{PERSONAS[persona].summary}</span>
+            </label>
+          </div>
+        }
         confirmLabel="Load sample data"
         onConfirm={() => {
-          const demo = demoLedger();
+          const demo = demoLedger(undefined, persona);
           dispatch({ type: 'ledger/replace', ledger: { ...demo, settings: { ...demo.settings, theme: ledger.settings.theme } } });
           notify('Sample data loaded.');
         }}
@@ -474,6 +493,36 @@ export function SettingsPage() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="field">
+              <span>Expected yearly return for projections</span>
+              <select
+                className="select"
+                value={s.projectionReturnBps}
+                onChange={(e) => dispatch({ type: 'settings/update', patch: { projectionReturnBps: Number(e.target.value) } })}
+              >
+                {[400, 600, 800, 1000, 1200, 1500].map((b) => (
+                  <option key={b} value={b}>
+                    {b / 100}% a year
+                  </option>
+                ))}
+              </select>
+              <span className="subtle">An assumption, not a promise. Lower is more cautious.</span>
+            </label>
+            <label className="field">
+              <span>Inflation</span>
+              <select
+                className="select"
+                value={s.inflationBps}
+                onChange={(e) => dispatch({ type: 'settings/update', patch: { inflationBps: Number(e.target.value) } })}
+              >
+                {[200, 300, 400, 500, 600, 800, 1000].map((b) => (
+                  <option key={b} value={b}>
+                    {b / 100}% a year
+                  </option>
+                ))}
+              </select>
+              <span className="subtle">Used to show what returns are worth in today's money.</span>
             </label>
             <label className="field">
               <span>Week starts on</span>

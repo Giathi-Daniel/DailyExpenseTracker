@@ -73,6 +73,7 @@ export function TransactionDialog({
   const [categoryId, setCategoryId] = useState(defaultCategory(initialKind));
   const [date, setDate] = useState(today());
   const [note, setNote] = useState('');
+  const [assetId, setAssetId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,16 +84,22 @@ export function TransactionDialog({
       setCategoryId(editing.categoryId);
       setDate(editing.date);
       setNote(editing.note);
+      setAssetId(editing.assetId ?? '');
     } else {
       setKind(initialKind);
       setAmount('');
       setCategoryId(defaultCategory(initialKind));
       setDate(today());
       setNote('');
+      setAssetId('');
     }
     setError(null);
     window.setTimeout(() => amountRef.current?.focus(), 0);
   }, [open, editing, initialKind, currency]);
+
+  const selectedGroup = ledger.categories.find((c) => c.id === categoryId)?.group;
+  const hasAssets = ledger.assets.some((a) => !a.archived);
+  const showAssets = hasAssets && kind === 'expense' && selectedGroup === 'savings';
 
   const changeKind = (k: TxKind) => {
     setKind(k);
@@ -111,7 +118,11 @@ export function TransactionDialog({
       setError('Choose a valid date.');
       return;
     }
-    const draft = { kind, amount: minor, categoryId, date, note: note.trim().slice(0, 140) };
+    const category = ledger.categories.find((c) => c.id === categoryId);
+    // Only money paid into savings is linked to an investment.
+    const linkable = kind === 'expense' && category?.group === 'savings';
+    const linked = linkable && assetId && ledger.assets.some((a) => a.id === assetId) ? assetId : undefined;
+    const draft = { kind, amount: minor, categoryId, date, note: note.trim().slice(0, 140), assetId: linked };
     if (editing) {
       dispatch({ type: 'tx/update', id: editing.id, patch: draft });
       notify('Transaction updated.');
@@ -177,6 +188,22 @@ export function TransactionDialog({
             <span>Date</span>
             <input className="input" type="date" value={date} max="2100-12-31" onChange={(e) => setDate(e.target.value)} required />
           </label>
+          {showAssets && (
+            <label className="field span-2">
+              <span>Put into (optional)</span>
+              <select className="select" value={assetId} onChange={(e) => setAssetId(e.target.value)}>
+                <option value="">Not linked</option>
+                {ledger.assets
+                  .filter((a) => !a.archived)
+                  .map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+              </select>
+              <span className="subtle">Adds this amount to that investment’s value.</span>
+            </label>
+          )}
           <label className="field span-2">
             <span>Note (optional)</span>
             <input

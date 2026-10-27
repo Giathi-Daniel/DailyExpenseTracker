@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState, type FormEvent } from 'react';
 import { HashRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router';
-import { demoLedger } from '../core/demo';
+import { demoLedger, PERSONAS, type Persona } from '../core/demo';
 import { emptyLedger } from '../core/ledger';
 import type { Transaction, TxKind } from '../core/schema';
 import { DecryptionError } from '../storage/crypto';
@@ -18,11 +18,15 @@ const InsightsPage = lazy(() => import('./pages/Insights').then((m) => ({ defaul
 const BudgetsPage = lazy(() => import('./pages/Budgets').then((m) => ({ default: m.BudgetsPage })));
 const RecurringPage = lazy(() => import('./pages/Recurring').then((m) => ({ default: m.RecurringPage })));
 const SettingsPage = lazy(() => import('./pages/Settings').then((m) => ({ default: m.SettingsPage })));
+const WealthPage = lazy(() => import('./pages/Wealth').then((m) => ({ default: m.WealthPage })));
+const GoalsPage = lazy(() => import('./pages/Goals').then((m) => ({ default: m.GoalsPage })));
 
 const BASE_ICON = `${import.meta.env.BASE_URL}icon.svg`;
 
 const NAV: Array<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: 'Overview', icon: 'home' },
+  { to: '/wealth', label: 'Wealth', icon: 'trend' },
+  { to: '/goals', label: 'Goals & growth', icon: 'flag' },
   { to: '/transactions', label: 'Transactions', icon: 'list' },
   { to: '/reports', label: 'Reports', icon: 'chart' },
   { to: '/insights', label: 'Insights', icon: 'bulb' },
@@ -118,6 +122,8 @@ function Shell() {
           <Suspense fallback={<div className="page" aria-busy="true" />}>
           <Routes>
             <Route path="/" element={<OverviewPage />} />
+            <Route path="/wealth" element={<WealthPage />} />
+            <Route path="/goals" element={<GoalsPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/insights" element={<InsightsPage />} />
@@ -214,10 +220,11 @@ function LockScreen() {
 }
 
 const FEATURES: Array<{ icon: IconName; title: string; body: string }> = [
-  { icon: 'wallet', title: 'Every shilling in one place', body: 'Salary, side jobs and tips in; daily spending out.' },
-  { icon: 'phone', title: 'Paste M-Pesa messages', body: 'Import confirmation SMS in bulk — no retyping.' },
-  { icon: 'chart', title: 'Monthly, quarterly, custom reports', body: 'Interactive charts with CSV and PDF export.' },
-  { icon: 'bulb', title: 'Automatic savings tips', body: 'Insights from your own habits, with the money each one is worth.' },
+  { icon: 'trend', title: 'Net worth, not just spending', body: 'Track what you own and owe, and watch it grow month by month.' },
+  { icon: 'flag', title: 'A roadmap from wherever you start', body: 'From clearing a mobile loan to living off investments — one clear next step.' },
+  { icon: 'chart', title: 'Growth planner and goals', body: 'See what steady investing becomes, and what waiting costs.' },
+  { icon: 'bulb', title: 'Automatic insights', body: 'Tips from your own numbers, with the money each one is worth.' },
+  { icon: 'wallet', title: 'Income and spending in one place', body: 'Salary, side jobs and tips in; daily spending out. Paste M-Pesa messages.' },
   { icon: 'shield', title: 'Private and encrypted', body: 'No account. Data never leaves your device. Optional AES-256 lock.' },
   { icon: 'offline', title: 'Works offline', body: 'Install it to your phone or desktop like an app.' },
 ];
@@ -232,10 +239,10 @@ function Welcome() {
           <span>Daily Expense Tracker</span>
         </div>
         <div>
-          <h1>Know where your money goes. Keep more of it.</h1>
+          <h1>Stop just tracking money. Start building wealth.</h1>
           <p className="muted" style={{ marginTop: 8 }}>
-            A private money tracker that turns your daily spending into clear reports and practical savings tips. No
-            sign-up required.
+            Whether you just graduated with nothing or already own property and shares, see your net worth, your next
+            step and what your money can become. Private, free, no sign-up.
           </p>
         </div>
         <div className="feature-list">
@@ -253,9 +260,17 @@ function Welcome() {
           <button type="button" className="btn btn-primary" onClick={() => start(emptyLedger())}>
             Start tracking
           </button>
-          <button type="button" className="btn" onClick={() => start(demoLedger())}>
-            Explore with sample data
-          </button>
+        </div>
+        <div className="persona-picker">
+          <h2>Or explore a sample</h2>
+          <div className="persona-list">
+            {(Object.keys(PERSONAS) as Persona[]).map((p) => (
+              <button key={p} type="button" className="persona" onClick={() => start(demoLedger(undefined, p))}>
+                <strong>{PERSONAS[p].label}</strong>
+                <span className="muted">{PERSONAS[p].summary}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

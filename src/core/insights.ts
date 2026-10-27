@@ -6,11 +6,21 @@ import {
   indexCategories,
   periodFor,
   summarize,
-  totalSaved,
   type CategoryIndex,
   type Summary,
 } from './reports';
 import type { Ledger, Transaction } from './schema';
+import {
+  ASSET_CLASS_LABEL,
+  ASSET_TYPES,
+  bpsToPct,
+  futureValue,
+  netWorthChange,
+  realReturnBps,
+  wealthPicture,
+  type AssetClass,
+  type WealthPicture,
+} from './wealth';
 
 /**
  * Rule-based savings coach. Every insight is derived from the user's own numbers,
@@ -48,6 +58,7 @@ interface Ctx {
   baselineByCategory: Map<string, number>;
   baselineSpending: number;
   historyDays: number;
+  wealth: WealthPicture;
 }
 
 function windowSummary(ledger: Ledger, endInclusive: ISODate, days: number, asOf: ISODate): Summary {
@@ -83,6 +94,7 @@ function buildCtx(ledger: Ledger, asOf: ISODate): Ctx {
     baselineByCategory,
     baselineSpending,
     historyDays,
+    wealth: wealthPicture(ledger, asOf),
   };
 }
 
@@ -231,7 +243,7 @@ const smallPurchases: Rule = ({ ledger, last30, cats, asOf, money }) => {
       severity: 'warning',
       title: `${small.length} small purchases added up to ${money(total)}`,
       detail: `Individually under ${money(threshold)}, together they are ${formatPct(total / Math.max(last30.spending, 1))} of your spending in the last 30 days.`,
-      action: `Halving them would save about ${money(total / 2)} a month — try a fixed weekly allowance for snacks, rides and treats.`,
+      action: `Halving them frees about ${money(total / 2)} a month. Invested at ${bpsToPct(ledger.settings.projectionReturnBps)} a year instead, that becomes roughly ${money(futureValue(0, total / 2, ledger.settings.projectionReturnBps, 120))} in 10 years. Try a fixed weekly allowance for snacks, rides and treats.`,
       impact: total / 2,
     },
   ];
@@ -365,32 +377,147 @@ const incomeMix: Rule = ({ ledger, asOf, money, name, historyDays }) => {
   return out;
 };
 
-const emergencyFund: Rule = ({ ledger, asOf, money, historyDays }) => {
-  if (historyDays < 25) return [];
-  const s = windowSummary(ledger, asOf, 90, asOf);
-  const monthlyNeeds = (s.needs / Math.min(90, Math.max(30, historyDays))) * 30;
+const emergencyFund: Rule = ({ money, historyDays, wealth }) => {
+  if (historyDays < 25 && !wealth.hasWealthData) return [];
+  const monthlyNeeds = wealth.monthlyEssentials;
   if (monthlyNeeds <= 0) return [];
-  const saved = totalSaved(ledger, asOf);
-  const months = saved / monthlyNeeds;
+  const months = wealth.cushionMonths;
+  const source = wealth.hasWealthData ? 'Cash, savings and money market funds' : 'Your savings';
   if (months >= 3) {
     return [
       {
         id: 'emergency-ok',
         severity: 'positive',
-        title: `Your savings cover ${months.toFixed(1)} months of essentials`,
-        detail: 'You have a solid emergency cushion. Consider putting additional savings to work in a money market fund or other low-risk investment.',
+        title: `${source} cover ${months.toFixed(1)} months of essentials`,
+        detail: 'You have a solid emergency cushion. Money beyond six months is better put to work in long-term investments.',
       },
     ];
   }
   const target = monthlyNeeds * 3;
+  const saved = months * monthlyNeeds;
   return [
     {
       id: 'emergency-fund',
       severity: 'info',
-      title: months < 0.5 ? 'You have no emergency cushion yet' : `Savings cover ${months.toFixed(1)} months of essentials`,
+      title: months < 0.5 ? 'You have no emergency cushion yet' : `${source} cover ${months.toFixed(1)} months of essentials`,
       detail: `Essentials cost you about ${money(monthlyNeeds)} a month. Three months of cover is ${money(target)}.`,
-      action: `Setting aside ${money((target - saved) / 12)} a month gets you there in a year. Record those transfers under "Savings & investments".`,
+      action: `Setting aside ${money((target - saved) / 12)} a month gets you there in a year.`,
     },
+  ];
+};
+
+// ---- Wealth rules ------------------------------------------------------------
+
+const highCostDebt: Rule = ({ wealth, money }) => {
+  const worst = wealth.highCostDebts[0];
+  if (!worst) return [];
+  const count = wealth.highCostDebts.length;
+  const monthly = wealth.highCostDebts.reduce((s, l) => s + (l.balance * l.aprBps) / 10_000 / 12, 0);
+  return [
+    {
+      id: 'high-cost-debt',
+      severity: 'critical',
+      title: `Expensive debt costs you about ${money(monthly)} a month`,
+      detail: `${count === 1 ? worst.name : `${count} debts`} at ${bpsToPct(worst.aprBps)}${count > 1 ? ' or less' : ''} a year. No investment reliably beats that rate, so paying it off is the best return available to you.`,
+      action: `Clear ${worst.name} first (highest rate)${count > 1 ? ', then the next' : ''}. Pause new investing beyond your starter cushion until it is gone.`,
+      impact: monthly,
+    },
+  ];
+};
+
+const idleCash: Rule = ({ ledger, wealth, money }) => {
+  if (!wealth.hasWealthData || wealth.monthlyEssentials <= 0) return [];
+  const lowYield = ledger.assets
+    .filter((a) => !a.archived && ASSET_TYPES[a.type].cls === 'cash' && a.expectedReturnBps < ledger.settings.inflationBps)
+    .reduce((s, a) => s + a.value, 0);
+  const surplus = wealth.liquid - wealth.monthlyEssentials * 6;
+  const idle = Math.min(lowYield, surplus);
+  if (idle <= wealth.monthlyEssentials) return [];
+  const lossPerYear = (idle * ledger.settings.inflationBps) / 10_000;
+  return [
+    {
+      id: 'idle-cash',
+      severity: 'warning',
+      title: `${money(idle)} is sitting idle beyond your emergency fund`,
+      detail: `With inflation at about ${bpsToPct(ledger.settings.inflationBps)}, cash earning little or nothing loses roughly ${money(lossPerYear)} of buying power a year.`,
+      action: 'Keep six months of essentials easy to reach and move the rest into interest-earning or long-term investments that suit your timeline.',
+      impact: lossPerYear / 12,
+    },
+  ];
+};
+
+const concentration: Rule = ({ wealth, money }) => {
+  const invested = wealth.byClass.income + wealth.byClass.growth + wealth.byClass.real;
+  if (invested <= 0 || invested < wealth.monthlySpending * 6) return [];
+  const top = (Object.entries(wealth.byClass) as Array<[AssetClass, number]>)
+    .filter(([c]) => c !== 'cash')
+    .sort((a, b) => b[1] - a[1])[0];
+  if (!top) return [];
+  const [cls, value] = top;
+  const share = value / invested;
+  if (share < 0.75) return [];
+  return [
+    {
+      id: 'concentration',
+      severity: 'info',
+      title: `${formatPct(share)} of your investments are ${ASSET_CLASS_LABEL[cls].toLowerCase()} assets`,
+      detail: `${money(value)} of ${money(invested)} sits in one kind of asset. A single bad year there would hit your whole net worth.`,
+      action: 'Spread new money across different asset types — interest-earning, growth and real assets — so no single one decides your future.',
+    },
+  ];
+};
+
+const realReturns: Rule = ({ ledger, wealth }) => {
+  // Only meaningful once there is real money at stake, not a small M-Pesa balance.
+  if (wealth.assets <= 0 || wealth.assets < wealth.monthlySpending * 3) return [];
+  const real = realReturnBps(wealth.weightedReturnBps, ledger.settings.inflationBps);
+  if (real > 100) return [];
+  return [
+    {
+      id: 'real-returns',
+      severity: 'info',
+      title:
+        real < 0
+          ? 'After inflation, your money is shrinking'
+          : `After inflation your assets grow only about ${bpsToPct(real)} a year`,
+      detail: `Your assumed average return is ${bpsToPct(wealth.weightedReturnBps)} against about ${bpsToPct(ledger.settings.inflationBps)} inflation.`,
+      action: 'Wealth needs assets that out-grow inflation over time. Review where your long-term money sits, and keep your return assumptions up to date.',
+    },
+  ];
+};
+
+const passiveIncome: Rule = ({ wealth, money }) => {
+  if (wealth.monthlyPassive <= 0 || wealth.monthlySpending <= 0) return [];
+  const share = wealth.monthlyPassive / wealth.monthlySpending;
+  return [
+    {
+      id: 'passive-income',
+      severity: 'positive',
+      title: `Your assets pay you ${money(wealth.monthlyPassive)} a month`,
+      detail: `Interest, dividends and rent cover ${formatPct(share)} of your spending — money earned without working for it.`,
+      action: share < 1 ? 'Reinvest it rather than spending it, and this share grows on its own.' : undefined,
+    },
+  ];
+};
+
+const netWorthTrend: Rule = ({ ledger, asOf, money }) => {
+  const change = netWorthChange(ledger, 3, asOf);
+  if (change === null || change === 0) return [];
+  return [
+    change > 0
+      ? {
+          id: 'net-worth-up',
+          severity: 'positive',
+          title: `Net worth up ${money(change)} recently`,
+          detail: 'That is the number that measures wealth. Keep the monthly review going.',
+        }
+      : {
+          id: 'net-worth-down',
+          severity: 'warning',
+          title: `Net worth down ${money(-change)} recently`,
+          detail: 'Spending, new debt or falling asset values have outpaced what you added.',
+          action: 'Check the Wealth page for which assets fell or which debts grew.',
+        },
   ];
 };
 
@@ -447,6 +574,7 @@ const noSpendDays: Rule = ({ ledger, cats, asOf }) => {
 };
 
 const RULES: Rule[] = [
+  highCostDebt,
   savingsRate,
   budgetPace,
   categoryTrends,
@@ -460,6 +588,11 @@ const RULES: Rule[] = [
   fees,
   weekendSpending,
   noSpendDays,
+  idleCash,
+  concentration,
+  realReturns,
+  passiveIncome,
+  netWorthTrend,
 ];
 
 export function generateInsights(ledger: Ledger, asOf: ISODate = todayFn()): Insight[] {
@@ -515,8 +648,7 @@ export function healthScore(ledger: Ledger, asOf: ISODate = todayFn()): Health |
     budgetNote = `${onTrack} of ${ledger.budgets.length} budgets on track`;
   }
 
-  const monthlyNeeds = s.needs > 0 ? s.needs : 1;
-  const months = totalSaved(ledger, asOf) / monthlyNeeds;
+  const months = wealthPicture(ledger, asOf).cushionMonths;
   const cushionPts = Math.min(1, months / 6) * 20;
 
   const wantsShare = s.wants / s.income;

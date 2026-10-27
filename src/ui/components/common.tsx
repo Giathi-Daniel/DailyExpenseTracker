@@ -6,16 +6,19 @@ export function Money({
   value,
   currency,
   compact,
+  whole,
   signed,
   className,
 }: {
   value: number;
   currency: string;
   compact?: boolean;
+  /** Drop minor units; for large headline figures. */
+  whole?: boolean;
   signed?: boolean;
   className?: string;
 }) {
-  const text = formatMoney(Math.abs(value), currency, { compact });
+  const text = formatMoney(Math.abs(value), currency, { compact, whole });
   const sign = signed ? (value > 0 ? '+' : value < 0 ? '−' : '') : value < 0 ? '−' : '';
   return <span className={`num ${className ?? ''}`}>{sign + text}</span>;
 }
