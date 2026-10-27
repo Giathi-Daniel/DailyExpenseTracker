@@ -6,6 +6,8 @@
 
 **Live demo: [giathi-daniel.github.io/DailyExpenseTracker](https://giathi-daniel.github.io/DailyExpenseTracker/)** — pick a sample (fresh graduate, salaried professional or established investor) to try it without entering anything.
 
+<a href="https://www.producthunt.com/products/dailyexpensetracker?embed=true&amp;utm_source=embed&amp;utm_medium=post_embed" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; padding: 8px 16px; background: rgb(255, 97, 84); color: rgb(255, 255, 255); text-decoration: none; border-radius: 9999px; font-size: 16px; font-weight: 600; line-height: 1.5;">Check it out on Product Hunt →</a></div>
+
 A private, local-first app for building wealth, not just tracking spending. It shows your net worth, gives you one clear next step from wherever you start — a graduate clearing a Fuliza balance or an investor approaching financial independence — and projects what steady investing becomes. Income, daily spending, reports and automatic insights are all built in. No account, no server, no tracking: data stays on the device and can be encrypted with a passphrase.
 
 ![Overview](docs/overview.png)
