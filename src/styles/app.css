@@ -716,9 +716,7 @@ a {
 .kpi-foot {
   font-size: 12px;
   color: var(--text-2);
-  display: flex;
-  gap: 6px;
-  align-items: center;
+  display: block;
 }
 
 .delta {
@@ -1427,4 +1425,353 @@ dialog.dialog::backdrop {
 
 .print-only {
   display: none;
+}
+
+/* ---------- Wealth ---------- */
+
+.stack-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.kpi-unit {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-2);
+}
+
+.card-note {
+  padding: 4px 20px 0;
+}
+
+.link-button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.roadmap {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.roadmap-step {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  position: relative;
+  padding-bottom: 14px;
+}
+
+/* Connector line between markers */
+.roadmap-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 28px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.roadmap-step[data-state='done']:not(:last-child)::before {
+  background: var(--good);
+}
+
+.roadmap-marker {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  border: 2px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  z-index: 1;
+}
+
+.roadmap-step[data-state='done'] .roadmap-marker {
+  background: var(--good);
+  border-color: var(--good);
+  color: #fff;
+}
+
+.roadmap-step[data-state='current'] .roadmap-marker {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.roadmap-body {
+  min-width: 0;
+  padding-top: 3px;
+}
+
+.roadmap-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.roadmap-step[data-state='done'] h3 {
+  font-weight: 400;
+  color: var(--text-2);
+}
+
+.roadmap-step[data-state='upcoming'] h3 {
+  color: var(--text-2);
+}
+
+.roadmap-step[data-state='current'] {
+  padding-bottom: 18px;
+}
+
+.roadmap-step[data-state='current'] .roadmap-body > * + * {
+  margin-top: 8px;
+}
+
+.roadmap-progress {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  max-width: 420px;
+}
+
+.roadmap-action {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.next-step {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  border-left: 3px solid var(--accent);
+}
+
+.next-step[data-done='true'] {
+  grid-template-columns: auto 1fr;
+  border-left-color: var(--good);
+  color: var(--good);
+}
+
+.next-step[data-done='true'] h2 {
+  color: var(--text);
+}
+
+.next-step-index {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.next-step-body {
+  min-width: 0;
+}
+
+.next-step-body h2 {
+  margin: 2px 0 4px;
+}
+
+.next-step-body p {
+  color: var(--text-2);
+}
+
+@media (max-width: 700px) {
+  .next-step {
+    grid-template-columns: auto 1fr;
+  }
+
+  .next-step > .btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .next-step-index {
+    display: none;
+  }
+
+  .next-step:not([data-done='true']) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: 12px;
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .review-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+.persona-picker h2 {
+  margin-bottom: 10px;
+}
+
+.persona-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.persona {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.persona:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.persona span {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+@media (max-width: 700px) {
+  .persona-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Goals & planner ---------- */
+
+.goal-grid {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.goal-card .card-header {
+  margin-bottom: 8px;
+}
+
+.goal-meta {
+  margin-top: 10px;
+}
+
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.fieldset legend {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.check-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.planner {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 24px;
+}
+
+.planner-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.planner-inputs input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.planner-output {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.planner-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.planner-kpis .card {
+  box-shadow: none;
+  background: var(--surface-2);
+}
+
+.planner-notes {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.habit-input {
+  max-width: 280px;
+  margin: 12px 0;
+}
+
+@media (max-width: 900px) {
+  .planner {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .page .planner-kpis {
+    grid-template-columns: 1fr;
+  }
 }
