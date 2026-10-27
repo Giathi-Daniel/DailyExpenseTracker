@@ -1,5 +1,11 @@
 # Daily Expense Tracker
 
+[![CI](https://github.com/Giathi-Daniel/DailyExpenseTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Giathi-Daniel/DailyExpenseTracker/actions/workflows/ci.yml)
+[![Deploy](https://github.com/Giathi-Daniel/DailyExpenseTracker/actions/workflows/deploy.yml/badge.svg)](https://github.com/Giathi-Daniel/DailyExpenseTracker/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+**Live demo: [giathi-daniel.github.io/DailyExpenseTracker](https://giathi-daniel.github.io/DailyExpenseTracker/)** — click “Explore with sample data” to try it without entering anything.
+
 A private, local-first money tracker. Record salary, side-job and tip income, log daily spending, read monthly / quarterly / custom reports, and get savings tips generated automatically from your own habits. No account, no server, no tracking — data stays on the device and can be encrypted with a passphrase.
 
 ![Overview](docs/overview.png)
@@ -65,7 +71,11 @@ npm run typecheck
 npm run build       # production build in dist/
 ```
 
-Requires Node 20+. Deploys as static files anywhere. For GitHub Pages, enable **Settings → Pages → Source: GitHub Actions**; the included workflow builds with the right base path and publishes on every push to `main`.
+Requires Node 20+. Deploys as static files anywhere. The included workflow publishes to GitHub Pages on every push to `main` (one-time setup: **Settings → Pages → Source: GitHub Actions**).
+
+## Tech stack
+
+React 19 · TypeScript (strict) · Vite · Recharts · Zod · Web Crypto API · Vitest + Testing Library · GitHub Actions · GitHub Pages
 
 ## Roadmap
 
